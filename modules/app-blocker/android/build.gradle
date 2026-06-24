@@ -1,6 +1,6 @@
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
-apply plugin: 'expo-modules-core'
+
 
 def safeExtGet(prop, fallback) {
   rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
@@ -8,7 +8,7 @@ def safeExtGet(prop, fallback) {
 
 android {
   namespace 'expo.modules.appblocker'
-  compileSdkVersion safeExtGet("compileSdkVersion", 35)
+  compileSdk safeExtGet("compileSdkVersion", 36)
 
   compileOptions {
     sourceCompatibility JavaVersion.VERSION_11
@@ -19,8 +19,8 @@ android {
   }
 
   defaultConfig {
-    minSdkVersion safeExtGet("minSdkVersion", 24)
-    targetSdkVersion safeExtGet("targetSdkVersion", 35)
+    minSdk safeExtGet("minSdkVersion", 24)
+    targetSdk safeExtGet("targetSdkVersion", 36)
   }
 }
 
