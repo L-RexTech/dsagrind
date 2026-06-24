@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "DSA Grind",
+    "slug": "dsa-grind",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "dsa-grind",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0d1117"
+    },
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {
+      "backgroundColor": "#0d1117",
+      "package": "com.lrextech.dsagrind"
+    },
+    "web": {
+      "favicon": "./assets/images/icon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "37aafa18-56f6-45f8-a648-e441410d95b3"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "./plugins/dist/withAppBlocker"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
