@@ -1,6 +1,7 @@
 node_modules/
 .expo/
 dist/
+!plugins/dist/
 *.tsbuildinfo
 .env
 .env.local
