@@ -107,6 +107,47 @@ export default function ProgressScreen() {
             )}
           </View>
 
+          {/* Milestones */}
+          <Text style={[styles.sectionTitle, { color: colors.mutedForeground, fontFamily: "Inter_600SemiBold" }]}>
+            MILESTONES
+          </Text>
+          <View style={styles.milestonesGrid}>
+            {[
+              { days: 1,   icon: "🌱", label: "First Step",      sub: "Complete 1 perfect day" },
+              { days: 7,   icon: "🔥", label: "Week Warrior",    sub: "7-day streak" },
+              { days: 30,  icon: "⚡", label: "Monthly Master",  sub: "30-day streak" },
+              { days: 100, icon: "💎", label: "Century Coder",   sub: "100-day streak" },
+            ].map(({ days, icon, label, sub }) => {
+              const unlocked = (state.longestStreak ?? 0) >= days;
+              return (
+                <View
+                  key={days}
+                  style={[
+                    styles.milestoneCard,
+                    {
+                      backgroundColor: unlocked ? colors.card : colors.background,
+                      borderColor: unlocked ? colors.primary + "60" : colors.border,
+                      opacity: unlocked ? 1 : 0.45,
+                    },
+                  ]}
+                >
+                  <Text style={styles.milestoneIcon}>{icon}</Text>
+                  <Text style={[styles.milestoneName, { color: unlocked ? colors.foreground : colors.mutedForeground, fontFamily: "Inter_700Bold" }]}>
+                    {label}
+                  </Text>
+                  <Text style={[styles.milestoneSub, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
+                    {sub}
+                  </Text>
+                  {unlocked && (
+                    <View style={[styles.unlockedBadge, { backgroundColor: colors.primary + "22" }]}>
+                      <Text style={[styles.unlockedText, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>Unlocked</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+
           {/* Stats grid */}
           <View style={styles.statsGrid}>
             <StatCard label="Problems Solved" value={totalCompleted} color={colors.primary} />
@@ -266,6 +307,31 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
   },
+  milestonesGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 20,
+  },
+  milestoneCard: {
+    flex: 1,
+    minWidth: "44%",
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    gap: 4,
+  },
+  milestoneIcon: { fontSize: 28, marginBottom: 2 },
+  milestoneName: { fontSize: 13, textAlign: "center" },
+  milestoneSub: { fontSize: 11, textAlign: "center" },
+  unlockedBadge: {
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  unlockedText: { fontSize: 10 },
   emptyText: { fontSize: 14, textAlign: "center" },
   dayRow: {
     flexDirection: "row",
