@@ -97,12 +97,12 @@ class AppBlockerService : Service() {
 
         val view = buildView()
         overlayView = view
-        try { windowManager.addView(view, params) } catch (_: Exception) { overlayView = null }
+        try { windowManager.addView(view, params) } catch (e: Exception) { overlayView = null }
     }
 
     private fun removeOverlay() {
         overlayView?.let {
-            try { windowManager.removeView(it) } catch (_: Exception) {}
+            try { windowManager.removeView(it) } catch (e: Exception) {}
             overlayView = null
         }
     }
@@ -165,7 +165,7 @@ class AppBlockerService : Service() {
                 }
                 try {
                     this@AppBlockerService.startActivity(intent)
-                } catch (_: Exception) {
+                } catch (e: Exception) {
                     packageManager.getLaunchIntentForPackage(packageName)?.apply {
                         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                         this@AppBlockerService.startActivity(this)
