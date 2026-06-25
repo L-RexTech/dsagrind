@@ -27,6 +27,7 @@ export default function ProgressScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { state, backlogDays } = useDSA();
+  const frozenSet = new Set(state.frozenDates ?? []);
   const fadeIn = useRef(new Animated.Value(0)).current;
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
@@ -73,20 +74,37 @@ export default function ProgressScreen() {
             ]}
           >
             <View style={styles.streakRow}>
-              <View>
+              <View style={styles.streakCol}>
                 <Text style={[styles.streakLabel, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
                   Current streak
                 </Text>
                 <StreakBadge streak={state.currentStreak} size="lg" />
               </View>
               <View style={styles.streakDivider} />
-              <View>
+              <View style={styles.streakCol}>
                 <Text style={[styles.streakLabel, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
                   Best streak
                 </Text>
                 <StreakBadge streak={state.longestStreak} size="lg" />
               </View>
+              <View style={styles.streakDivider} />
+              <View style={styles.streakCol}>
+                <Text style={[styles.streakLabel, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
+                  Freezes
+                </Text>
+                <View style={styles.freezeCount}>
+                  <Text style={styles.freezeEmoji}>❄️</Text>
+                  <Text style={[styles.freezeNum, { color: "#58a6ff", fontFamily: "Inter_700Bold" }]}>
+                    {state.streakFreezes ?? 0}
+                  </Text>
+                </View>
+              </View>
             </View>
+            {(state.streakFreezes ?? 0) < 3 && (
+              <Text style={[styles.freezeHint, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
+                ❄️ Earn a freeze by completing all 3 problems · max 3
+              </Text>
+            )}
           </View>
 
           {/* Stats grid */}
@@ -116,43 +134,48 @@ export default function ProgressScreen() {
           ) : (
             last14.map((a) => {
               const isPerfect = a.completedIds.length >= 3;
-              const hasBacklog = a.completedIds.length < 3;
+              const isFrozen = frozenSet.has(a.date);
               const today = new Date().toISOString().split("T")[0];
               const isToday = a.date === today;
               const d = new Date(a.date + "T12:00:00");
               const label = isToday ? "Today" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+              const borderColor = isPerfect
+                ? colors.primary + "40"
+                : isFrozen
+                ? "#58a6ff40"
+                : colors.border;
               return (
                 <View
                   key={a.date}
                   style={[
                     styles.dayRow,
-                    {
-                      backgroundColor: colors.card,
-                      borderColor: isPerfect ? colors.primary + "40" : colors.border,
-                      borderWidth: 1,
-                    },
+                    { backgroundColor: colors.card, borderColor, borderWidth: 1 },
                   ]}
                 >
                   <Text style={[styles.dayDate, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
                     {label}
                   </Text>
                   <View style={styles.dotsRow}>
-                    {Array.from({ length: 3 }).map((_, i) => (
-                      <View
-                        key={i}
-                        style={[
-                          styles.dot,
-                          {
-                            backgroundColor:
-                              i < a.completedIds.length
-                                ? isPerfect
-                                  ? colors.primary
-                                  : colors.accent
-                                : colors.border,
-                          },
-                        ]}
-                      />
-                    ))}
+                    {isFrozen ? (
+                      <Text style={styles.frozenIcon}>❄️</Text>
+                    ) : (
+                      Array.from({ length: 3 }).map((_, i) => (
+                        <View
+                          key={i}
+                          style={[
+                            styles.dot,
+                            {
+                              backgroundColor:
+                                i < a.completedIds.length
+                                  ? isPerfect
+                                    ? colors.primary
+                                    : colors.accent
+                                  : colors.border,
+                            },
+                          ]}
+                        />
+                      ))
+                    )}
                   </View>
                   <Text
                     style={[
@@ -160,6 +183,8 @@ export default function ProgressScreen() {
                       {
                         color: isPerfect
                           ? colors.primary
+                          : isFrozen
+                          ? "#58a6ff"
                           : isToday
                           ? colors.accent
                           : colors.destructive,
@@ -167,7 +192,7 @@ export default function ProgressScreen() {
                       },
                     ]}
                   >
-                    {isPerfect ? "Done" : isToday ? "Today" : "Missed"}
+                    {isPerfect ? "Done" : isFrozen ? "Frozen" : isToday ? "Today" : "Missed"}
                   </Text>
                 </View>
               );
@@ -200,12 +225,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-around",
   },
+  streakCol: { alignItems: "center" },
   streakDivider: {
     width: 1,
     height: 48,
     backgroundColor: "#30363d",
   },
-  streakLabel: { fontSize: 12, marginBottom: 8 },
+  streakLabel: { fontSize: 12, marginBottom: 8, textAlign: "center" },
+  freezeCount: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
+  freezeEmoji: { fontSize: 22 },
+  freezeNum: { fontSize: 26 },
+  freezeHint: { fontSize: 11, textAlign: "center", marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: "#30363d" },
+  frozenIcon: { fontSize: 18, textAlign: "center" },
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
