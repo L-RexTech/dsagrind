@@ -14,6 +14,7 @@ import {
 } from "@/modules/app-blocker";
 
 const BLOCKED_APPS = ["com.instagram.android"];
+const MAX_FREEZES = 3;
 
 export type Difficulty = "Easy" | "Medium" | "Hard";
 export type Category =
@@ -53,6 +54,8 @@ export interface DSAState {
   assignments: DailyAssignment[];
   currentStreak: number;
   longestStreak: number;
+  streakFreezes: number;
+  frozenDates: string[];
 }
 
 interface DSAContextValue {
@@ -71,6 +74,7 @@ interface DSAContextValue {
   getTodayProgress: () => { completed: number; total: number };
   generateTodayAssignment: () => void;
   dismissGate: () => void;
+  useFreeze: () => void;
 }
 
 const DSAContext = createContext<DSAContextValue | null>(null);
@@ -119,9 +123,14 @@ const DEFAULT_QUESTIONS: DSAQuestion[] = [
   { id: "q30", title: "Product of Array Except Self", difficulty: "Medium", category: "Arrays", url: "https://leetcode.com/problems/product-of-array-except-self/" },
 ];
 
-function computeStreaks(assignments: DailyAssignment[]): { current: number; longest: number } {
+function computeStreaks(
+  assignments: DailyAssignment[],
+  frozenDates: string[] = []
+): { current: number; longest: number } {
+  const frozenSet = new Set(frozenDates);
+
   const completed = assignments
-    .filter((a) => a.completedIds.length >= QUESTIONS_PER_DAY)
+    .filter((a) => a.completedIds.length >= QUESTIONS_PER_DAY || frozenSet.has(a.date))
     .map((a) => a.date)
     .sort()
     .reverse();
@@ -129,7 +138,6 @@ function computeStreaks(assignments: DailyAssignment[]): { current: number; long
   if (completed.length === 0) return { current: 0, longest: 0 };
 
   let current = 0;
-  let longest = 0;
   let streak = 0;
   const today = getTodayString();
 
@@ -153,7 +161,6 @@ function computeStreaks(assignments: DailyAssignment[]): { current: number; long
         break;
       }
     }
-    if (streak > longest) longest = streak;
   }
   current = streak;
 
@@ -161,7 +168,7 @@ function computeStreaks(assignments: DailyAssignment[]): { current: number; long
   let allStreak = 0;
   let maxStreak = 0;
   const allCompleted = assignments
-    .filter((a) => a.completedIds.length >= QUESTIONS_PER_DAY)
+    .filter((a) => a.completedIds.length >= QUESTIONS_PER_DAY || frozenSet.has(a.date))
     .map((a) => a.date)
     .sort();
 
@@ -186,10 +193,11 @@ function computeStreaks(assignments: DailyAssignment[]): { current: number; long
   return { current, longest: maxStreak };
 }
 
-function computeBacklog(assignments: DailyAssignment[]): number {
+function computeBacklog(assignments: DailyAssignment[], frozenDates: string[] = []): number {
   const today = getTodayString();
+  const frozenSet = new Set(frozenDates);
   return assignments.filter(
-    (a) => a.date < today && a.completedIds.length < QUESTIONS_PER_DAY
+    (a) => a.date < today && a.completedIds.length < QUESTIONS_PER_DAY && !frozenSet.has(a.date)
   ).length;
 }
 
@@ -199,13 +207,14 @@ export function DSAProvider({ children }: { children: React.ReactNode }) {
     assignments: [],
     currentStreak: 0,
     longestStreak: 0,
+    streakFreezes: 0,
+    frozenDates: [],
   });
   const [loaded, setLoaded] = useState(false);
   const [tick, setTick] = useState(0);
   const [hasAllPermissions, setHasAllPermissions] = useState(false);
   const [isGateDismissed, setIsGateDismissed] = useState(false);
 
-  // Re-evaluate isBlocked and permission status every 60 seconds
   useEffect(() => {
     const check = () => {
       setHasAllPermissions(hasUsageAccess() && hasOverlayPermission());
@@ -222,9 +231,14 @@ export function DSAProvider({ children }: { children: React.ReactNode }) {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw) as DSAState;
-          setState(parsed);
+          // Migrate old state that may not have freeze fields
+          setState({
+            ...parsed,
+            streakFreezes: parsed.streakFreezes ?? 0,
+            frozenDates: parsed.frozenDates ?? [],
+          });
         }
-      } catch (_) {}
+      } catch (e) {}
       setLoaded(true);
     })();
   }, []);
@@ -232,14 +246,14 @@ export function DSAProvider({ children }: { children: React.ReactNode }) {
   const persist = useCallback(async (next: DSAState) => {
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch (_) {}
+    } catch (e) {}
   }, []);
 
   const updateState = useCallback(
     (updater: (prev: DSAState) => DSAState) => {
       setState((prev) => {
         const next = updater(prev);
-        const { current, longest } = computeStreaks(next.assignments);
+        const { current, longest } = computeStreaks(next.assignments, next.frozenDates);
         const updated: DSAState = {
           ...next,
           currentStreak: current,
@@ -311,14 +325,30 @@ export function DSAProvider({ children }: { children: React.ReactNode }) {
   const markCompleted = useCallback(
     (questionId: string) => {
       const today = getTodayString();
-      updateState((prev) => ({
-        ...prev,
-        assignments: prev.assignments.map((a) =>
+      updateState((prev) => {
+        const updatedAssignments = prev.assignments.map((a) =>
           a.date === today && !a.completedIds.includes(questionId)
             ? { ...a, completedIds: [...a.completedIds, questionId] }
             : a
-        ),
-      }));
+        );
+
+        // Award 1 freeze when today's 3rd problem is completed (once per day)
+        const prevToday = prev.assignments.find((a) => a.date === today);
+        const newToday = updatedAssignments.find((a) => a.date === today);
+        const justFinishedDay =
+          (prevToday?.completedIds.length ?? 0) < QUESTIONS_PER_DAY &&
+          (newToday?.completedIds.length ?? 0) >= QUESTIONS_PER_DAY;
+
+        const newFreezes = justFinishedDay
+          ? Math.min(MAX_FREEZES, prev.streakFreezes + 1)
+          : prev.streakFreezes;
+
+        return {
+          ...prev,
+          assignments: updatedAssignments,
+          streakFreezes: newFreezes,
+        };
+      });
     },
     [updateState]
   );
@@ -338,6 +368,28 @@ export function DSAProvider({ children }: { children: React.ReactNode }) {
     [updateState]
   );
 
+  const useFreeze = useCallback(() => {
+    updateState((prev) => {
+      if (prev.streakFreezes <= 0) return prev;
+      const today = getTodayString();
+      // Find the most recent missed day (to protect streak continuity)
+      const missedDay = [...prev.assignments]
+        .filter(
+          (a) =>
+            a.date < today &&
+            a.completedIds.length < QUESTIONS_PER_DAY &&
+            !prev.frozenDates.includes(a.date)
+        )
+        .sort((a, b) => b.date.localeCompare(a.date))[0];
+      if (!missedDay) return prev;
+      return {
+        ...prev,
+        streakFreezes: prev.streakFreezes - 1,
+        frozenDates: [...prev.frozenDates, missedDay.date],
+      };
+    });
+  }, [updateState]);
+
   const getQuestion = useCallback(
     (id: string) => state.questions.find((q) => q.id === id),
     [state.questions]
@@ -355,12 +407,10 @@ export function DSAProvider({ children }: { children: React.ReactNode }) {
   const todayAssignment =
     state.assignments.find((a) => a.date === getTodayString()) ?? null;
 
-  const backlogDays = computeBacklog(state.assignments);
+  const backlogDays = computeBacklog(state.assignments, state.frozenDates);
 
-  // A "blocked" state: backlog > 0, or not all solved and it's past 3pm.
-  // `tick` is referenced so re-renders happen every minute (from the interval above).
   const isBlocked = (() => {
-    void tick; // keep tick in scope so re-evaluation fires on each minute tick
+    void tick;
     if (backlogDays > 0) return true;
     const hour = new Date().getHours();
     const progress = getTodayProgress();
@@ -368,14 +418,12 @@ export function DSAProvider({ children }: { children: React.ReactNode }) {
     return false;
   })();
 
-  // Generate today's assignment once loaded
   useEffect(() => {
     if (loaded) {
       generateTodayAssignment();
     }
   }, [loaded, generateTodayAssignment]);
 
-  // When the user is no longer blocked, reset the dismissed flag
   useEffect(() => {
     if (!isBlocked) {
       setIsGateDismissed(false);
@@ -386,7 +434,6 @@ export function DSAProvider({ children }: { children: React.ReactNode }) {
     setIsGateDismissed(true);
   }, []);
 
-  // Start/stop native Instagram blocker service based on blocked state + permissions
   useEffect(() => {
     if (!loaded) return;
     if (isBlocked && hasAllPermissions) {
@@ -414,6 +461,7 @@ export function DSAProvider({ children }: { children: React.ReactNode }) {
         getTodayProgress,
         generateTodayAssignment,
         dismissGate,
+        useFreeze,
       }}
     >
       {children}
