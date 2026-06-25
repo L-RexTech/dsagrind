@@ -246,6 +246,7 @@ export default function TodayScreen() {
             const q = getQuestion(qId);
             if (!q) return null;
             const isCompleted = todayAssignment.completedIds.includes(qId);
+            const isReview = todayAssignment.reviewIds?.includes(qId) ?? false;
             return (
               <QuestionCard
                 key={qId}
@@ -253,6 +254,7 @@ export default function TodayScreen() {
                 isCompleted={isCompleted}
                 showCheckbox
                 index={idx}
+                isReview={isReview}
                 onToggleComplete={() => {
                   if (isCompleted) markUncompleted(qId);
                   else markCompleted(qId);
