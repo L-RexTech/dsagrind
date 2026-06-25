@@ -31,7 +31,15 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "./plugins/dist/withAppBlocker"
+      "./plugins/dist/withAppBlocker",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#0d1117",
+          "sounds": []
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
