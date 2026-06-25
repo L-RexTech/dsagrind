@@ -49,52 +49,59 @@ class AppBlockerModule : Module() {
         // ── Permission open-settings helpers ─────────────────────────────────
 
         Function("openUsageAccessSettings") {
-            val ctx = appContext.reactContext ?: return@Function
-            ctx.startActivity(
+            appContext.reactContext?.startActivity(
                 Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
             )
+            null
         }
 
         Function("openOverlaySettings") {
-            val ctx = appContext.reactContext ?: return@Function
-            ctx.startActivity(
-                Intent(
-                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    android.net.Uri.parse("package:${ctx.packageName}")
-                ).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                }
-            )
+            appContext.reactContext?.let { ctx ->
+                ctx.startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        android.net.Uri.parse("package:${ctx.packageName}")
+                    ).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                )
+            }
+            null
         }
 
         // ── Service control ──────────────────────────────────────────────────
 
         Function("startBlocker") { packages: List<String> ->
-            val ctx = appContext.reactContext ?: return@Function
-            prefs.edit()
-                .putStringSet("blocked_packages", packages.toSet())
-                .putBoolean("blocking_active", true)
-                .apply()
-            val intent = Intent(ctx, AppBlockerService::class.java).apply {
-                action = AppBlockerService.ACTION_START
+            appContext.reactContext?.let { ctx ->
+                prefs.edit()
+                    .putStringSet("blocked_packages", packages.toSet())
+                    .putBoolean("blocking_active", true)
+                    .apply()
+                val intent = Intent(ctx, AppBlockerService::class.java).apply {
+                    action = AppBlockerService.ACTION_START
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    ctx.startForegroundService(intent)
+                } else {
+                    ctx.startService(intent)
+                }
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                ctx.startForegroundService(intent)
-            } else {
-                ctx.startService(intent)
-            }
+            null
         }
 
         Function("stopBlocker") {
-            val ctx = appContext.reactContext ?: return@Function
-            prefs.edit().putBoolean("blocking_active", false).apply()
-            ctx.stopService(Intent(ctx, AppBlockerService::class.java))
+            appContext.reactContext?.let { ctx ->
+                prefs.edit().putBoolean("blocking_active", false).apply()
+                ctx.stopService(Intent(ctx, AppBlockerService::class.java))
+            }
+            null
         }
 
         Function("updateBlockingState") { active: Boolean ->
             prefs.edit().putBoolean("blocking_active", active).apply()
+            null
         }
     }
 }
