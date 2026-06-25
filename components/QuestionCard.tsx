@@ -12,6 +12,7 @@ interface QuestionCardProps {
   onToggleComplete?: () => void;
   showCheckbox?: boolean;
   index?: number;
+  isReview?: boolean;
 }
 
 const DIFFICULTY_COLORS: Record<string, string> = {
@@ -26,6 +27,7 @@ export function QuestionCard({
   onToggleComplete,
   showCheckbox = false,
   index = 0,
+  isReview = false,
 }: QuestionCardProps) {
   const colors = useColors();
   const scale = useRef(new Animated.Value(1)).current;
@@ -90,6 +92,13 @@ export function QuestionCard({
                   {question.category}
                 </Text>
               </View>
+              {isReview && (
+                <View style={[styles.catTag, { backgroundColor: "#1f6feb33" }]}>
+                  <Text style={[styles.tagText, { color: "#58a6ff", fontFamily: "Inter_500Medium" }]}>
+                    🔄 Review
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
