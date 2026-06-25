@@ -12,6 +12,10 @@ import {
   startBlocker,
   stopBlocker,
 } from "@/modules/app-blocker";
+import {
+  requestNotificationPermissions,
+  scheduleDailyReminder,
+} from "@/utils/notifications";
 
 const BLOCKED_APPS = ["com.instagram.android"];
 const MAX_FREEZES = 3;
@@ -47,6 +51,7 @@ export interface DailyAssignment {
   date: string; // YYYY-MM-DD
   questionIds: string[];
   completedIds: string[];
+  reviewIds?: string[]; // questions assigned for spaced repetition review
 }
 
 export interface DSAState {
@@ -305,18 +310,40 @@ export function DSAProvider({ children }: { children: React.ReactNode }) {
       const existing = prev.assignments.find((a) => a.date === today);
       if (existing) return prev;
 
-      const usedIds = new Set(prev.assignments.flatMap((a) => a.questionIds));
-      const available = prev.questions.filter((q) => !usedIds.has(q.id));
-      const pool = available.length >= QUESTIONS_PER_DAY ? available : prev.questions;
+      // Build last-solved map for spaced repetition
+      const lastSolvedMap = new Map<string, string>();
+      for (const a of prev.assignments) {
+        for (const qId of a.completedIds) {
+          const curr = lastSolvedMap.get(qId);
+          if (!curr || a.date > curr) lastSolvedMap.set(qId, a.date);
+        }
+      }
+      const twoWeeksAgo = getDateString(new Date(Date.now() - 14 * 86400000));
 
-      const shuffled = [...pool].sort(() => Math.random() - 0.5);
-      const picked = shuffled.slice(0, QUESTIONS_PER_DAY).map((q) => q.id);
+      // Priority 1: solved 14+ days ago (spaced repetition review)
+      const reviewDue = prev.questions
+        .filter((q) => { const d = lastSolvedMap.get(q.id); return d !== undefined && d <= twoWeeksAgo; })
+        .sort(() => Math.random() - 0.5);
+
+      // Priority 2: never solved before
+      const neverDone = prev.questions
+        .filter((q) => !lastSolvedMap.has(q.id))
+        .sort(() => Math.random() - 0.5);
+
+      // Priority 3: solved recently (fallback)
+      const recentlySolved = prev.questions
+        .filter((q) => { const d = lastSolvedMap.get(q.id); return d !== undefined && d > twoWeeksAgo; })
+        .sort(() => Math.random() - 0.5);
+
+      const orderedPool = [...reviewDue, ...neverDone, ...recentlySolved];
+      const picked = orderedPool.slice(0, QUESTIONS_PER_DAY).map((q) => q.id);
+      const reviewIds = picked.filter((id) => reviewDue.some((q) => q.id === id));
 
       return {
         ...prev,
         assignments: [
           ...prev.assignments,
-          { date: today, questionIds: picked, completedIds: [] },
+          { date: today, questionIds: picked, completedIds: [], reviewIds },
         ],
       };
     });
@@ -423,6 +450,20 @@ export function DSAProvider({ children }: { children: React.ReactNode }) {
       generateTodayAssignment();
     }
   }, [loaded, generateTodayAssignment]);
+
+  // Request notification permissions on first load
+  useEffect(() => {
+    if (loaded) requestNotificationPermissions().catch(() => {});
+  }, [loaded]);
+
+  // Schedule/cancel 12 PM reminder based on today's progress
+  useEffect(() => {
+    if (!loaded) return;
+    const today = getTodayString();
+    const todayA = state.assignments.find((a) => a.date === today);
+    const hasStarted = (todayA?.completedIds.length ?? 0) > 0;
+    scheduleDailyReminder(hasStarted).catch(() => {});
+  }, [loaded, state.assignments]);
 
   useEffect(() => {
     if (!isBlocked) {
