@@ -37,6 +37,7 @@ export default function TodayScreen() {
     markUncompleted,
     getQuestion,
     getTodayProgress,
+    useFreeze,
   } = useDSA();
   const progress = getTodayProgress();
   const fadeIn = useRef(new Animated.Value(0)).current;
@@ -204,16 +205,26 @@ export default function TodayScreen() {
 
           {/* ── Backlog warning ─────────────────────────────────────────────── */}
           {backlogDays > 0 && (
-            <Pressable
-              style={[styles.backlogBanner, { backgroundColor: colors.destructive + "22", borderColor: colors.destructive + "60" }]}
-              onPress={handleBlockedPress}
-            >
-              <Ionicons name="warning" size={18} color={colors.destructive} />
-              <Text style={[styles.backlogText, { color: colors.destructive, fontFamily: "Inter_600SemiBold" }]}>
-                {backlogDays} day{backlogDays > 1 ? "s" : ""} of backlog — Instagram is blocked
-              </Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.destructive} />
-            </Pressable>
+            <View style={[styles.backlogCard, { backgroundColor: colors.destructive + "22", borderColor: colors.destructive + "60" }]}>
+              <Pressable style={styles.backlogRow} onPress={handleBlockedPress}>
+                <Ionicons name="warning" size={18} color={colors.destructive} />
+                <Text style={[styles.backlogText, { color: colors.destructive, fontFamily: "Inter_600SemiBold" }]}>
+                  {backlogDays} day{backlogDays > 1 ? "s" : ""} of backlog — Instagram is blocked
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.destructive} />
+              </Pressable>
+              {state.streakFreezes > 0 && (
+                <Pressable
+                  style={[styles.freezeBtn, { backgroundColor: "#1e3a5f", borderColor: "#58a6ff60" }]}
+                  onPress={() => { useFreeze(); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }}
+                >
+                  <Text style={{ fontSize: 16 }}>❄️</Text>
+                  <Text style={[styles.freezeBtnText, { fontFamily: "Inter_600SemiBold" }]}>
+                    Use Streak Freeze ({state.streakFreezes} left)
+                  </Text>
+                </Pressable>
+              )}
+            </View>
           )}
 
           {/* ── Blocking active indicator ───────────────────────────────────── */}
@@ -314,16 +325,31 @@ const styles = StyleSheet.create({
   doneSub: { fontSize: 13 },
   progressTitle: { fontSize: 18, marginBottom: 4 },
   progressSub: { fontSize: 13 },
-  backlogBanner: {
+  backlogCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 14,
+    overflow: "hidden",
+  },
+  backlogRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 14,
   },
   backlogText: { flex: 1, fontSize: 13 },
+  freezeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    margin: 10,
+    marginTop: 0,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: "center",
+  },
+  freezeBtnText: { fontSize: 14, color: "#58a6ff" },
   blockingActive: {
     flexDirection: "row",
     alignItems: "center",
